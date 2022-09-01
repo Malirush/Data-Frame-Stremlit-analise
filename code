@@ -1,0 +1,161 @@
+
+import matplotlib.pyplot as plt
+from sklearn import datasets, linear_model
+from sklearn.metrics import mean_squared_error, r2_score
+
+import pandas as pd 
+import streamlit as st 
+import plotly.express as px
+
+
+
+
+data=pd.read_csv(r'C:\Users\Lfcgl\OneDrive\Desktop\profra\insurance.csv')
+
+st.set_page_config(page_title='Personal medical costs',page_icon=':anger:', layout='wide')
+
+col1, col2, col3 = st.columns(3)
+col2.write(data, use_column_width=True)
+col1.write('''BMI<18,5- Magro\n
+18,5<BMI>24,9- Normal\n
+25<BMI>29,9- Sobrepeso/Obesidade I\n
+30<BMI>39,9- Obesidade II\n
+BMI>40- Obesidade III''')
+
+
+for i in range(14):
+    i=col1.write('')
+
+
+
+st.sidebar.header('Selecione os filtros:')
+smokers=st.sidebar.multiselect(
+    'fumante:',
+    options=data['smoker'].unique(),
+    default=data['smoker'].unique()
+)
+
+regiao=st.sidebar.multiselect('regiao:',
+options=data['region'].unique(),
+default=data['region'].unique()
+)
+
+filhos=st.sidebar.multiselect('Quantidade de filhos:',
+options=data['children'].unique(),
+default=data['children'].unique()
+)
+
+bmi_min=min(list(data['bmi']))
+bmi_max=max(list(data['bmi']))
+
+
+bmis=col2.slider('nivel de bmi:',
+min_value=bmi_min,
+max_value=bmi_max)
+
+idade_min=min(list(data['age']))
+idade_max=max(list(data['age']))
+
+age_bar=col1.slider('selecione a idade',
+min_value=idade_min,
+max_value=idade_max)
+
+filtering_data2=data.query(
+    'age==@age_bar & smoker==@smokers & region==@regiao & children==@filhos & bmi>=@bmis'  
+)
+
+filtering_data=data.query(
+    'age==@age_bar & smoker==@smokers & region==@regiao & children==@filhos & bmi<=@bmis'  
+)
+
+
+
+
+if len(filtering_data)>0:
+    media_preco=sum(list(filtering_data['charges']))/len(filtering_data['charges'])
+    for i in filtering_data['charges']:
+        if i==(2.5*media_preco):
+           filtering_data.drop(filtering_data.loc[filtering_data['charges']==i].index, inplace=True)
+    st.write('Valor medio do plano pago:',media_preco)
+
+if len(filtering_data2)>0:
+    media_preco2=sum(list(filtering_data2['charges']))/len(filtering_data2['charges'])
+    for i in filtering_data2['charges']:
+        if i>(2.5*media_preco2):
+           filtering_data2.drop(filtering_data2.loc[filtering_data2['charges']==i].index, inplace=True)
+    st.write('Valor medio do plano pago tabela 2:',media_preco2)
+
+
+
+col2.write(filtering_data2)
+col1.write(filtering_data)
+
+if len(filtering_data)>0 and len(filtering_data2)>0:
+    if media_preco2>media_preco:
+        preco_medio=100-((media_preco/media_preco2)*100)
+        col2.write(f'{preco_medio:.2f}% a menos.')
+    else:
+        preco_medio=100-((media_preco2/media_preco)*100)
+        col2.write(f'{preco_medio:.2f}% a mais')
+       
+fumantesdata1=0       
+for i in filtering_data['smoker']:
+    if i=='yes':
+        fumantesdata1+=1
+fumantesdata2=0
+for i in filtering_data2['smoker']:
+    if i=='yes':
+        fumantesdata2+=1
+
+col1.write(f'quantidade de fumantes: {fumantesdata1}')
+col2.write(f'quantidade de fumantes: {fumantesdata2}')
+
+
+
+
+plt1=px.line(x=data['bmi'],y=data['charges'], title='BMI x preco')
+col3.write(plt1)
+fumantes=data.loc[data['smoker']=='yes']
+naofumantes=data.loc[data['smoker']=='no']
+x=sum(fumantes['charges'])
+x_media=x/len(fumantes)
+y=sum(naofumantes['charges'])
+y_media=x/len(naofumantes)
+plt2=px.histogram(x=data['smoker'],y=data['charges'],color=data['smoker'])
+col3.write('Valor geral pago por fumantes e nao fumantes:')
+col3.write(plt2)
+col3.write(f'numero de fumantes: {len(fumantes)}')
+col3.write(f'media de valor pago: {x_media:.2f}')
+col3.write('')
+col3.write(f'numero de nao fumantes: {len(naofumantes)}')
+col3.write(f'media de valor pago: {y_media:.2f}')
+
+#inicializacao do ML
+data['smoker']=data['smoker'].replace('yes',1)
+data['smoker']=data['smoker'].replace('no',0)
+
+x=data.drop(['age','sex','region','charges'],axis=1)
+y=data['charges'].values
+
+test_size=100
+x_train=x[:-test_size]
+y_train=y[:-test_size]
+
+x_test=x[-test_size:]
+y_test=y[-test_size:]
+
+regr=linear_model.LinearRegression()
+regr.fit(x_train,y_train)
+pred_y=regr.predict(x_test)
+
+
+print('coefficients: \n',regr.coef_)
+print("Mean squared error: %.2f" % mean_squared_error(y_test, pred_y))
+print("Coefficient of determination: %.2f" % r2_score(y_test, pred_y))
+model_list=list(x_test.values)
+st.sidebar.write('MODELOS CRIADOS POR ML')
+for x,y in zip(model_list,pred_y):
+    print('model:', x,'actual:', y)
+    st.sidebar.write('model:', x,'actual:', y)
+
+col3.write('diretorio github')
